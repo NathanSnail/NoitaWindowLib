@@ -21,3 +21,10 @@
 ---@field cx int
 ---@field cy int
 ---@field window window
+
+---@class (exact) resize
+---@field anchor_x int?
+---@field anchor_y int?
+---@field glue_x int
+---@field glue_y int
+---@field window window
