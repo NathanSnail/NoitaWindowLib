@@ -14,3 +14,10 @@
 ---@field width int
 ---@field height int
 ---@field tabs tab[]
+
+---@class (exact) drag
+---@field wx int
+---@field wy int
+---@field cx int
+---@field cy int
+---@field window window
