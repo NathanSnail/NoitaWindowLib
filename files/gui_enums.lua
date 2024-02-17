@@ -80,5 +80,10 @@ local TEXTURE_FILTERING_MODE = {
 }
 
 ---@class gui_enums
-local bundle = {gui_option = GUI_OPTION, rect_animation_playback = GUI_RECT_ANIMATION_PLAYBACK, texture_wrapping = TEXTURE_WRAPPING_MODE, texture_filtering = TEXTURE_FILTERING_MODE}
+local bundle = {
+	gui_option = GUI_OPTION,
+	rect_animation_playback = GUI_RECT_ANIMATION_PLAYBACK,
+	texture_wrapping = TEXTURE_WRAPPING_MODE,
+	texture_filtering = TEXTURE_FILTERING_MODE
+}
 return bundle

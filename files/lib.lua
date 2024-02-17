@@ -30,15 +30,18 @@ defs.texture_wrapping = gui_enums.texture_wrapping
 ---@field private gui_id int
 ---@field private drag drag? exists if a window is currently being dragged
 ---@field private resize resize?
----@field private grab_size int
+---@field private gui_stackframe int
+---@field private gui_stack gui_element[]
+---@field grab_size int
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
 lib.gui_id = 2
-lib.grab_size = 5
+lib.grab_size = 15
+lib.gui_stackframe = 0
 
 function lib:update()
-	self:check_drag()
+	self:check_clicks()
 	self:render()
 end
 
@@ -53,10 +56,10 @@ function lib:render()
 end
 
 ---@param tabs tab[]? {}
----@param x integer? 0
----@param y integer? 0
----@param width integer? 100
----@param height integer? 100
+---@param x number? 0
+---@param y number? 0
+---@param width number? 100
+---@param height number? 100
 ---@return window new_window
 function lib:make_window(tabs, x, y, width, height)
 	---@type window
@@ -72,7 +75,7 @@ function lib:make_window(tabs, x, y, width, height)
 end
 
 ---@private
----@return integer id
+---@return int id
 function lib:new_id()
 	self.gui_id = self.gui_id + 1
 	return self.gui_id
@@ -94,13 +97,29 @@ function lib:render_window(window)
 end
 
 ---@private
-function lib:check_drag()
+function lib:check_clicks()
 	local click = InputIsMouseButtonDown(defs.mouse.left)
 	local cursor_x, cursor_y = InputGetMousePosOnScreen()
+	lib:handle_held(cursor_x, cursor_y)
+	if not click then
+		self.drag = nil
+		self.resize = nil
+		return
+	end
+	if not InputIsMouseButtonJustDown(defs.mouse.left) then return end
+	for _, window in ipairs(self.windows) do
+		lib:window_collision_check(window, cursor_x, cursor_y)
+	end
+end
+
+---@private
+---@param cursor_x number
+---@param cursor_y number
+function lib:handle_held(cursor_x, cursor_y)
 	if self.drag then
 		--TODO: this will break if a window is deleted while dragging, the window_delete fn will need to account for this
-		self.drag.window.x = cursor_x - self.drag.cx + self.drag.wx
-		self.drag.window.y = cursor_y - self.drag.cy + self.drag.wy
+		self.drag.window.x = cursor_x - self.drag.start_cursor_x + self.drag.start_window_x
+		self.drag.window.y = cursor_y - self.drag.start_cursor_y + self.drag.start_window_y
 	end
 	if self.resize then
 		local x = self.resize.anchor_x
@@ -132,40 +151,47 @@ function lib:check_drag()
 			self.resize.window.height = math.max(cursor_y_glued - self.resize.window.y, self.grab_size * 2)
 		end
 	end
-	if not click then
-		self.drag = nil
-		self.resize = nil
-		return
-	end
-	if not InputIsMouseButtonJustDown(defs.mouse.left) then return end
-	for _, window in ipairs(self.windows) do
-		local x1, y1 = window.x, window.y
-		local x2, y2 = x1 + window.width, y1 + window.height
-		if x1 < cursor_x and cursor_x < x2 and y1 < cursor_y and cursor_y < y2 then
-			local res_x = utils:near_many(cursor_x, self.grab_size, x1, x2)
-			local res_y = utils:near_many(cursor_y, self.grab_size, y1, y2)
-			if res_x or res_y then
-				local edge_x = cursor_x
-				if res_x then
-					edge_x = ({ x1, x2 })[res_x]
-				end
-				local edge_y = cursor_y
-				if res_y then
-					edge_y = ({ y1, y2 })[res_y]
-				end
-				self.resize = {
-					window = window,
-					anchor_x = res_x,
-					anchor_y = res_y,
-					glue_x = edge_x - cursor_x,
-					glue_y = edge_y - cursor_y
-				}
-				return
+end
+
+---@private
+---@param window window
+---@param cursor_x number
+---@param cursor_y number
+---@return boolean
+function lib:window_collision_check(window, cursor_x, cursor_y)
+	local x1, y1 = window.x, window.y
+	local x2, y2 = x1 + window.width, y1 + window.height
+	if x1 < cursor_x and cursor_x < x2 and y1 < cursor_y and cursor_y < y2 then
+		local res_x = utils:near_many(cursor_x, self.grab_size, x1, x2)
+		local res_y = utils:near_many(cursor_y, self.grab_size, y1, y2)
+		if res_x or res_y then
+			local edge_x = cursor_x
+			if res_x then
+				edge_x = ({ x1, x2 })[res_x]
 			end
-			self.drag = { window = window, wx = window.x, wy = window.y, cx = cursor_x, cy = cursor_y }
-			return
+			local edge_y = cursor_y
+			if res_y then
+				edge_y = ({ y1, y2 })[res_y]
+			end
+			self.resize = {
+				window = window,
+				anchor_x = res_x,
+				anchor_y = res_y,
+				glue_x = edge_x - cursor_x,
+				glue_y = edge_y - cursor_y
+			}
+			return true
 		end
+		self.drag = {
+			window = window,
+			start_window_x = window.x,
+			start_window_y = window.y,
+			start_cursor_x = cursor_x,
+			start_cursor_y = cursor_y
+		}
+		return true
 	end
+	return false
 end
 
 return lib
