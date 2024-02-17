@@ -36,7 +36,6 @@ defs.texture_wrapping = gui_enums.texture_wrapping
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
-lib.gui_id = 2
 lib.grab_size = 15
 lib.gui_z = -1000
 
@@ -49,11 +48,13 @@ end
 function lib:render()
 	self.gui_id = 2
 	self.gui_stack = {}
+	self.gui_z = -1000
 	GuiStartFrame(self.gui)
 	GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
 	for window_idx, window in ipairs(self.windows) do
 		self:render_window(window, window_idx)
 	end
+	self:render_stack()
 end
 
 ---@param tabs tab[]? {}
@@ -85,7 +86,6 @@ end
 ---@private
 ---@param window window
 function lib:render_window(window, window_idx)
-	table.insert(self.gui_stack, {})
 	GuiText(self.gui, window.x / 2, window.y / 2, tostring(window_idx))
 	GuiImage(
 		self.gui,
@@ -115,10 +115,12 @@ end
 
 ---@private
 function lib:render_stack()
+	print("stack rendering time")
 	for _, stackframe in ipairs(self.gui_stack) do
-		table.sort(stackframe, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
-		for _, elem in ipairs(stackframe) do
-			lib:render_elem(elem, stackframe)
+		table.sort(stackframe.gui_elements, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
+		print("rendering stackframe")
+		for _, elem in ipairs(stackframe.gui_elements) do
+			self:render_elem(elem, stackframe)
 		end
 	end
 end
@@ -132,11 +134,18 @@ local function render_text(gui, elem, z, x, y)
 	local text_elem = elem.data
 	---@cast text_elem text
 	GuiZSetForNextWidget(gui, z)
-	if text_elem.description then
-		GuiTooltip(gui, "Hello", text_elem.description)
+	if elem.centred then
+		print("centring", x, y)
+		local width, height = GuiGetTextDimensions(gui, text_elem.text)
+		x, y = x - width, y - height
+		print("centred", x, y)
 	end
-	print(x,y,text_elem.text)
-	GuiText(gui, x, y, text_elem.text)
+	print(x, y, text_elem.text)
+	GuiText(gui, x / 2, y / 2, text_elem.text)
+	if text_elem.description then
+		print(text_elem.description)
+		GuiTooltip(gui, text_elem.description, "")
+	end
 end
 
 ---@param text string
@@ -191,7 +200,7 @@ end
 function lib:check_clicks()
 	local click = InputIsMouseButtonDown(defs.mouse.left)
 	local cursor_x, cursor_y = InputGetMousePosOnScreen()
-	lib:handle_held(cursor_x, cursor_y)
+	self:handle_held(cursor_x, cursor_y)
 	if not click then
 		self.drag = nil
 		self.resize = nil
@@ -199,7 +208,7 @@ function lib:check_clicks()
 	end
 	if not InputIsMouseButtonJustDown(defs.mouse.left) then return end
 	for window_idx, window in ipairs(self.windows) do
-		if lib:window_collision_check(window, cursor_x, cursor_y) then
+		if self:window_collision_check(window, cursor_x, cursor_y) then
 			table.remove(self.windows, window_idx)
 			table.insert(self.windows, 1, window)
 			return
