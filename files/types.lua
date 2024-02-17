@@ -14,4 +14,3 @@
 ---@field width int
 ---@field height int
 ---@field tabs tab[]
----@field render fun(lib: window_lib, self: window)
