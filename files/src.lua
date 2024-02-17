@@ -1,18 +1,22 @@
 --dofile("mods/windows/files/types.lua")
+dofile_once("data/scripts/debug/keycodes.lua")
 
 ---@class (exact) window_lib
 ---@field private windows window[]
----@field gui gui
----@field gui_id int
+---@field private gui gui
+---@field private gui_id int
+---@field private drag drag?
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
 lib.gui_id = 2
 
 function lib:update()
+	self:check_drag()
 	self:render()
 end
 
+---@private
 function lib:render()
 	self.gui_id = 2
 	for _, window in ipairs(self.windows) do
@@ -39,23 +43,50 @@ function lib:make_window(tabs, x, y, width, height)
 	return window
 end
 
+---@private
 ---@return integer id
 function lib:new_id()
 	self.gui_id = self.gui_id + 1
 	return self.gui_id
 end
 
+---@private
+---@param window window
 function lib:render_window(window)
 	GuiImage(
 		self.gui,
 		self:new_id(),
-		window.x,
-		window.y,
+		window.x / 2,
+		window.y / 2,
 		"mods/windows/files/window_bg.png",
 		1,
-		window.width,
-		window.height
+		window.width / 2,
+		window.height / 2
 	)
+end
+
+---@private
+function lib:check_drag()
+	local click = InputIsMouseButtonDown(Mouse_left)
+	local cx, cy = InputGetMousePosOnScreen()
+	print(cx, cy)
+	if self.drag then
+		--TODO: this will break if a window is deleted while dragging, the window_delete fn will need to account for this
+		self.drag.window.x = cx - self.drag.cx + self.drag.wx
+		self.drag.window.y = cy - self.drag.cy + self.drag.wy
+	end
+	if not click then
+		self.drag = nil
+		return
+	end
+	if not InputIsMouseButtonJustDown(Mouse_left) then return end
+	for _, window in ipairs(self.windows) do
+		local x1, y1 = window.x, window.y
+		local x2, y2 = x1 + window.width, y1 + window.height
+		if x1 < cx and cx < x2 and y1 < cy and cy < y2 then
+			self.drag = { window = window, wx = window.x, wy = window.y, cx = cx, cy = cy }
+		end
+	end
 end
 
 return lib
