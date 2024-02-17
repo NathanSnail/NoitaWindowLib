@@ -1,30 +1,48 @@
 ---@meta
 
 ---@alias int integer
----@alias render_fn fun(lib: window_lib, window: window, tab_idx: int): nil
+---@alias bool boolean
+---@alias tab_fn fun(lib: window_lib, window: window, tab_idx: int): nil
 
 ---@class (exact) tab
 ---@field title string
----@field render render_fn
----@field update fun(lib: window_lib, window: window, tab_idx: int)
+---@field render tab_fn
+---@field update tab_fn
 
 ---@class (exact) window
----@field x int
----@field y int
----@field width int
----@field height int
+---@field x number
+---@field y number
+---@field width number
+---@field height number
 ---@field tabs tab[]
 
 ---@class (exact) drag
----@field wx int
----@field wy int
----@field cx int
----@field cy int
+---@field start_window_x number
+---@field start_window_y number
+---@field start_cursor_x number
+---@field start_cursor_y number
 ---@field window window
 
 ---@class (exact) resize
----@field anchor_x int?
----@field anchor_y int?
----@field glue_x int
----@field glue_y int
+---@field anchor_x number?
+---@field anchor_y number?
+---@field glue_x number
+---@field glue_y number
 ---@field window window
+
+---@alias anchor_pos "low" | "centre" | "high"
+
+---@class (exact) image
+---@field size_x number
+---@field size_y number
+---@field alpha number
+---@field centred bool
+---@field file string
+
+---@class (exact) gui_element
+---@field anchor_x anchor_pos
+---@field anchor_y anchor_pos
+---@field offset_x number
+---@field offset_y number
+---@field data image
+--TODO: this class needs more data variants
