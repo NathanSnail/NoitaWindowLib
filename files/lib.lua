@@ -30,15 +30,15 @@ defs.texture_wrapping = gui_enums.texture_wrapping
 ---@field private gui_id int
 ---@field private drag drag? exists if a window is currently being dragged
 ---@field private resize resize?
----@field private gui_stackframe int
----@field private gui_stack gui_element[]
+---@field private gui_stack gui_stackframe[]
+---@field private gui_z number
 ---@field grab_size int
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
 lib.gui_id = 2
 lib.grab_size = 15
-lib.gui_stackframe = 0
+lib.gui_z = -1000
 
 function lib:update()
 	self:check_clicks()
@@ -48,10 +48,11 @@ end
 ---@private
 function lib:render()
 	self.gui_id = 2
+	self.gui_stack = {}
 	GuiStartFrame(self.gui)
-	GuiOptionsAdd(lib.gui, defs.gui_option.NoPositionTween)
-	for _, window in ipairs(self.windows) do
-		self:render_window(window)
+	GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+	for window_idx, window in ipairs(self.windows) do
+		self:render_window(window, window_idx)
 	end
 end
 
@@ -83,7 +84,9 @@ end
 
 ---@private
 ---@param window window
-function lib:render_window(window)
+function lib:render_window(window, window_idx)
+	table.insert(self.gui_stack, {})
+	GuiText(self.gui, window.x / 2, window.y / 2, tostring(window_idx))
 	GuiImage(
 		self.gui,
 		self:new_id(),
@@ -94,6 +97,94 @@ function lib:render_window(window)
 		window.width / 2,
 		window.height / 2
 	)
+	for k, tab in ipairs(window.tabs) do
+		if k == 1 then --TODO: some sort of tab management system where windows can have tabs selected, ideally > 1 in a tiling system, or perhaps thats a special type of window
+			---@type gui_stackframe
+			local stackframe = {
+				gui_elements = tab.get_elems(lib, window, k),
+				window = window,
+				x = window.x,
+				y = window.y,
+				width = window.width,
+				height = window.height
+			}
+			table.insert(self.gui_stack, stackframe)
+		end
+	end
+end
+
+---@private
+function lib:render_stack()
+	for _, stackframe in ipairs(self.gui_stack) do
+		table.sort(stackframe, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
+		for _, elem in ipairs(stackframe) do
+			lib:render_elem(elem, stackframe)
+		end
+	end
+end
+
+---@param gui gui
+---@param elem gui_element
+---@param z number
+---@param x number
+---@param y number
+local function render_text(gui, elem, z, x, y)
+	local text_elem = elem.data
+	---@cast text_elem text
+	GuiZSetForNextWidget(gui, z)
+	if text_elem.description then
+		GuiTooltip(gui, "Hello", text_elem.description)
+	end
+	print(x,y,text_elem.text)
+	GuiText(gui, x, y, text_elem.text)
+end
+
+---@param text string
+---@param z number
+---@param anchor_x anchor_pos
+---@param anchor_y anchor_pos
+---@param centred bool
+---@param offset_x number
+---@param offset_y number
+---@param colour colour?
+---@param description string?
+---@return gui_element
+function lib:create_text_gui_elem(text, z, anchor_x, anchor_y, centred, offset_x, offset_y, colour, description)
+	---@type text
+	local text = { text = text, description = description, render = render_text }
+	---@type gui_element
+	local elem = {
+		virtual_z_index = z,
+		anchor_x = anchor_x,
+		anchor_y = anchor_y,
+		centred = centred,
+		offset_x = offset_x,
+		offset_y = offset_y,
+		data = text,
+		colour = colour
+	}
+	return elem
+end
+
+---@private
+---@param elem gui_element
+---@param stackframe gui_stackframe
+function lib:render_elem(elem, stackframe)
+	local colour = elem.colour
+	if colour then
+		GuiColorSetForNextWidget(self.gui, colour.red, colour.green, colour.blue, colour.alpha)
+	end
+	local x_mult = elem.anchor_x == "high" and -1 or 1
+	local y_mult = elem.anchor_y == "high" and -1 or 1
+	local x_coeff = ({ low = 0, centre = 0.5, high = 1 })[elem.anchor_x]
+	local y_coeff = ({ low = 0, centre = 0.5, high = 1 })[elem.anchor_y]
+	local x1, y1 = stackframe.x, stackframe.y
+	local x2, y2 = x1 + stackframe.width, y1 + stackframe.height
+	local x = x2 * x_coeff + x1 * (1 - x_coeff) + x_mult * elem.offset_x
+	local y = y2 * y_coeff + y1 * (1 - y_coeff) + y_mult * elem.offset_x
+	print("rendering")
+	elem.data.render(self.gui, elem, self.gui_z, x, y)
+	self.gui_z = self.gui_z - 1
 end
 
 ---@private
@@ -107,8 +198,12 @@ function lib:check_clicks()
 		return
 	end
 	if not InputIsMouseButtonJustDown(defs.mouse.left) then return end
-	for _, window in ipairs(self.windows) do
-		lib:window_collision_check(window, cursor_x, cursor_y)
+	for window_idx, window in ipairs(self.windows) do
+		if lib:window_collision_check(window, cursor_x, cursor_y) then
+			table.remove(self.windows, window_idx)
+			table.insert(self.windows, 1, window)
+			return
+		end
 	end
 end
 
