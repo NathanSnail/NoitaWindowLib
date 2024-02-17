@@ -1,5 +1,26 @@
 --dofile("mods/windows/files/types.lua")
-dofile_once("data/scripts/debug/keycodes.lua")
+---@type button_bundle
+local buttons = dofile_once("mods/windows/files/input_codes.lua")
+---@type gui_enums
+local gui_enums = dofile_once("mods/windows/files/gui_enums.lua")
+
+---@class (exact) defs
+---@field mouse mouse_buttons
+---@field keyboard keyboard_buttons
+---@field controller controller_buttons
+---@field gui_option gui_option
+---@field rec_animation_playback rect_animation_playback 
+---@field texture_filtering texture_filtering
+---@field texture_wrapping texture_wrapping
+
+local defs = {}
+defs.mouse = buttons.mouse
+defs.keyboard = buttons.keyboard
+defs.controller = buttons.controller
+defs.gui_option = gui_enums.gui_option
+defs.rect_animation_playback = gui_enums.rect_animation_playback
+defs.texture_filtering = gui_enums.texture_filtering
+defs.texture_wrapping = gui_enums.texture_wrapping
 
 ---@class (exact) window_lib
 ---@field private windows window[]
@@ -11,6 +32,7 @@ lib.windows = {}
 lib.gui = GuiCreate()
 lib.gui_id = 2
 
+
 function lib:update()
 	self:check_drag()
 	self:render()
@@ -19,6 +41,8 @@ end
 ---@private
 function lib:render()
 	self.gui_id = 2
+	GuiStartFrame(self.gui)
+	GuiOptionsAdd(lib.gui, defs.gui_option.NoPositionTween)
 	for _, window in ipairs(self.windows) do
 		self:render_window(window)
 	end
@@ -67,9 +91,8 @@ end
 
 ---@private
 function lib:check_drag()
-	local click = InputIsMouseButtonDown(Mouse_left)
+	local click = InputIsMouseButtonDown(defs.mouse.left)
 	local cx, cy = InputGetMousePosOnScreen()
-	print(cx, cy)
 	if self.drag then
 		--TODO: this will break if a window is deleted while dragging, the window_delete fn will need to account for this
 		self.drag.window.x = cx - self.drag.cx + self.drag.wx
@@ -79,7 +102,7 @@ function lib:check_drag()
 		self.drag = nil
 		return
 	end
-	if not InputIsMouseButtonJustDown(Mouse_left) then return end
+	if not InputIsMouseButtonJustDown(defs.mouse.left) then return end
 	for _, window in ipairs(self.windows) do
 		local x1, y1 = window.x, window.y
 		local x2, y2 = x1 + window.width, y1 + window.height
