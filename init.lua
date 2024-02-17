@@ -11,7 +11,7 @@ for i = 1, 5 do
 			end,
 			get_elems = function(lib, window, tab_idx)
 				print("hi")
-				return { lib:create_text_gui_elem("hamis", 1, "centre", "centre", true, 0, 0, nil, "wowie") }
+				return { lib:create_text_gui_elem("hamis", 1, "centre", "centre", true, 0, 0, nil, "wowie\nDoes\nThe\nTitle\nEven\nMatter?") }
 			end
 		}
 		table.insert(tablist, tab)
