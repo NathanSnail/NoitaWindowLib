@@ -17,6 +17,7 @@
 ---@field width number
 ---@field height number
 ---@field tabs tab[]
+---@field selected_tab int
 
 ---@class (exact) drag
 ---@field start_window_x number
@@ -60,7 +61,6 @@
 ---@field centred bool
 ---@field colour colour?
 ---@field data image | text
---TODO: this class needs more data variants
 
 ---@class (exact) gui_stackframe
 ---@field gui_elements gui_element[]
