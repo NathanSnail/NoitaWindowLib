@@ -42,4 +42,23 @@ function utils:copy(original)
 	return copy
 end
 
+--- Mutates the original set
+---@generic T
+---@param set T[]
+---@param extra T
+---@return T combined
+function utils.with_mut(set, extra)
+	table.insert(set, extra)
+	return set
+end
+
+--- Creates a copy of the original set
+---@generic T
+---@param set T[]
+---@param extra T
+---@return T combined
+function utils:with(set, extra)
+	return self.with_mut(self:copy(set), extra)
+end
+
 return utils

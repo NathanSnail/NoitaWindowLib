@@ -125,11 +125,25 @@ function lib:gui_cutout(stackframe, inner)
 	GuiEndAutoBoxNinePiece(self.gui)
 	GuiAnimateEnd(self.gui)
 	--your content here
-	-- GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
-	-- GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
+	GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+	GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
 	inner()
-	-- GuiOptionsClear(self.gui)
+	GuiOptionsClear(self.gui)
 	GuiEndScrollContainer(self.gui)
+	-- TODO: make the sounds go away
+	GuiOptionsAdd(self.gui, defs.gui_option.NoSound)
+	GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
+	GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
+	GuiOptionsAdd(self.gui, defs.gui_option.IsDraggable)
+	GuiOptionsAdd(self.gui, defs.gui_option.IsExtraDraggable)
+	GuiOptionsAdd(self.gui, defs.gui_option.ScrollContainer_Smooth)
+	GuiOptionsAdd(self.gui, defs.gui_option.Hack_AllowDuplicateIds)
+	GuiOptionsAdd(self.gui,defs.gui_option.IgnoreContainer)
+	GuiOptionsAdd(self.gui,defs.gui_option._SnapToCenter)
+	-- GuiOptionsAdd(self.gui, defs.gui_option.NoSound)
+	GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
+		stackframe.height / 2)
+	--TODO: make windows manage their own bg as an inner() element
 end
 
 ---@private
@@ -142,7 +156,6 @@ function lib:render_stack()
 				self:render_elem(elem, stackframe)
 			end
 		end)
-		GuiZSetForNextWidget(self.gui, self:new_z())
 		--GuiImageNinePiece(self.gui, self:newGuiAnimateBegin(gui)
 		--(stackframe.x, stackframe.y, stackframe.width, stackframe.height, 0)
 		-- GuiBeginScrollContainer(self.gui, -1, stackframe.x, stackframe.y, stackframe.width, stackframe.height,
