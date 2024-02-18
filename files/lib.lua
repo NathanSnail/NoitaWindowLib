@@ -5,16 +5,10 @@ local buttons = dofile_once("mods/windows/files/input_codes.lua")
 local gui_enums = dofile_once("mods/windows/files/gui_enums.lua")
 ---@type utils
 local utils = dofile_once("mods/windows/files/utils.lua")
+---@type tab
+local default_tab = dofile_once("mods/windows/files/default_tab.lua")
 
----@class (exact) defs
----@field mouse mouse_buttons
----@field keyboard keyboard_buttons
----@field controller controller_buttons
----@field gui_option gui_option
----@field rec_animation_playback rect_animation_playback
----@field texture_filtering texture_filtering
----@field texture_wrapping texture_wrapping
-
+---@class defs
 local defs = {}
 defs.mouse = buttons.mouse
 defs.keyboard = buttons.keyboard
@@ -32,12 +26,14 @@ defs.texture_wrapping = gui_enums.texture_wrapping
 ---@field private resize resize?
 ---@field private gui_stack gui_stackframe[]
 ---@field private gui_z number
+---@field default_tab tab
 ---@field grab_size int
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
 lib.grab_size = 15
 lib.gui_z = -1000
+lib.default_tab = default_tab
 
 function lib:update()
 	self:check_clicks()
@@ -50,7 +46,6 @@ function lib:render()
 	self.gui_stack = {}
 	self.gui_z = -1000
 	GuiStartFrame(self.gui)
-	GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
 	for window_idx, window in ipairs(self.windows) do
 		self:render_window(window, window_idx)
 	end
@@ -66,11 +61,12 @@ end
 function lib:make_window(tabs, x, y, width, height)
 	---@type window
 	local window = {
-		tabs = tabs or {},
+		tabs = tabs or { utils:copy(default_tab) },
 		x = x or 0,
 		y = y or 0,
 		width = width or 100,
 		height = height or 100,
+		selected_tab = 1,
 	}
 	table.insert(self.windows, window)
 	return window
@@ -83,22 +79,16 @@ function lib:new_id()
 	return self.gui_id
 end
 
+---@return tab[]
+function lib:default_tab_list()
+	return { utils:copy(self.default_tab) }
+end
+
 ---@private
 ---@param window window
 function lib:render_window(window, window_idx)
-	GuiText(self.gui, window.x / 2, window.y / 2, tostring(window_idx))
-	GuiImage(
-		self.gui,
-		self:new_id(),
-		window.x / 2,
-		window.y / 2,
-		"mods/windows/files/window_bg.png",
-		1,
-		window.width / 2,
-		window.height / 2
-	)
 	for k, tab in ipairs(window.tabs) do
-		if k == 1 then --TODO: some sort of tab management system where windows can have tabs selected, ideally > 1 in a tiling system, or perhaps thats a special type of window
+		if k == window.selected_tab then --TODO: some sort of tab management system where windows can have tabs selected, ideally > 1 in a tiling system, or perhaps thats a special type of window
 			---@type gui_stackframe
 			local stackframe = {
 				gui_elements = tab.get_elems(lib, window, k),
@@ -114,14 +104,49 @@ function lib:render_window(window, window_idx)
 end
 
 ---@private
+---@return int
+function lib:new_z()
+	self.gui_z = self.gui_z - 1
+	return self.gui_z
+end
+
+---@private
+---@param stackframe gui_stackframe
+---@param inner fun()
+function lib:gui_cutout(stackframe, inner)
+	-- credits to aarvlo for this method
+	local cutout_id = self:new_id()
+	print(cutout_id)
+	GuiAnimateBegin(self.gui)
+	GuiAnimateAlphaFadeIn(self.gui, cutout_id, 0, 0, true)
+	GuiBeginAutoBox(self.gui)
+	GuiBeginScrollContainer(self.gui, cutout_id, stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
+		stackframe.height / 2, false, 0, 0)
+	GuiEndAutoBoxNinePiece(self.gui)
+	GuiAnimateEnd(self.gui)
+	--your content here
+	-- GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+	-- GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
+	inner()
+	-- GuiOptionsClear(self.gui)
+	GuiEndScrollContainer(self.gui)
+end
+
+---@private
 function lib:render_stack()
-	print("stack rendering time")
 	for _, stackframe in ipairs(self.gui_stack) do
+		GuiOptionsClear(self.gui)
 		table.sort(stackframe.gui_elements, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
-		print("rendering stackframe")
-		for _, elem in ipairs(stackframe.gui_elements) do
-			self:render_elem(elem, stackframe)
-		end
+		self:gui_cutout(stackframe, function()
+			for _, elem in ipairs(stackframe.gui_elements) do
+				self:render_elem(elem, stackframe)
+			end
+		end)
+		GuiZSetForNextWidget(self.gui, self:new_z())
+		--GuiImageNinePiece(self.gui, self:newGuiAnimateBegin(gui)
+		--(stackframe.x, stackframe.y, stackframe.width, stackframe.height, 0)
+		-- GuiBeginScrollContainer(self.gui, -1, stackframe.x, stackframe.y, stackframe.width, stackframe.height,
+		-- 	false, 0, 0)
 	end
 end
 
@@ -133,17 +158,14 @@ end
 local function render_text(gui, elem, z, x, y)
 	local text_elem = elem.data
 	---@cast text_elem text
+	print(z)
 	GuiZSetForNextWidget(gui, z)
 	if elem.centred then
-		print("centring", x, y)
 		local width, height = GuiGetTextDimensions(gui, text_elem.text)
 		x, y = x - width, y - height
-		print("centred", x, y)
 	end
-	print(x, y, text_elem.text)
 	GuiText(gui, x / 2, y / 2, text_elem.text)
 	if text_elem.description then
-		print(text_elem.description)
 		GuiTooltip(gui, text_elem.description, "")
 	end
 end
@@ -160,7 +182,7 @@ end
 ---@return gui_element
 function lib:create_text_gui_elem(text, z, anchor_x, anchor_y, centred, offset_x, offset_y, colour, description)
 	---@type text
-	local text = { text = text, description = description, render = render_text }
+	local data = { text = text, description = description, render = render_text }
 	---@type gui_element
 	local elem = {
 		virtual_z_index = z,
@@ -169,7 +191,7 @@ function lib:create_text_gui_elem(text, z, anchor_x, anchor_y, centred, offset_x
 		centred = centred,
 		offset_x = offset_x,
 		offset_y = offset_y,
-		data = text,
+		data = data,
 		colour = colour
 	}
 	return elem
@@ -191,9 +213,7 @@ function lib:render_elem(elem, stackframe)
 	local x2, y2 = x1 + stackframe.width, y1 + stackframe.height
 	local x = x2 * x_coeff + x1 * (1 - x_coeff) + x_mult * elem.offset_x
 	local y = y2 * y_coeff + y1 * (1 - y_coeff) + y_mult * elem.offset_x
-	print("rendering")
-	elem.data.render(self.gui, elem, self.gui_z, x, y)
-	self.gui_z = self.gui_z - 1
+	elem.data.render(self.gui, elem, self:new_z(), x - stackframe.x, y - stackframe.y)
 end
 
 ---@private
