@@ -10,7 +10,8 @@ for i = 1, 5 do
 
 			end,
 			get_elems = function(lib, window, tab_idx)
-				return { lib:create_text_gui_elem("hamis", 1, "centre", "centre", true, 0, 0, nil, "wowie\nDoes\nThe\nTitle\nEven\nMatter?") }
+				return { lib:create_text_gui_elem("hamis", 1, "centre", "centre", true, 0, 0, nil,
+					"wowie\nDoes\nThe\nTitle\nEven\nMatter?") }
 			end
 		}
 		table.insert(tablist, tab)
@@ -19,5 +20,8 @@ for i = 1, 5 do
 end
 
 function OnWorldPreUpdate()
-	lib:update()
+	for i = 1, 1 do
+		-- update takes ~ 11us / window for a default window
+		lib:update()
+	end
 end
