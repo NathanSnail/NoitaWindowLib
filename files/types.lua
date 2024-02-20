@@ -4,7 +4,7 @@
 ---@alias bool boolean
 ---@alias tab_update_fn fun(lib: window_lib, window: window, tab_idx: int)
 ---@alias tab_render_fn fun(lib: window_lib, window: window, tab_idx: int): gui_element[]
----@alias render_fn fun(gui: gui, elem: gui_element, z: number, x: number, y:number)
+---@alias render_fn fun(gui: gui, elem: gui_element, x: number, y:number)
 
 ---@class (exact) tab
 ---@field title string

@@ -138,6 +138,13 @@ function lib:gui_cutout(stackframe, inner, outer)
 end
 
 ---@private
+---@param func fun(id: int)
+function lib:enclose_elem(func)
+	GuiZSetForNextWidget(self.gui, self:new_z())
+	func(self:new_id())
+end
+
+---@private
 function lib:render_stack()
 	for _, stackframe in ipairs(self.gui_stack) do
 		GuiOptionsClear(self.gui)
@@ -145,20 +152,23 @@ function lib:render_stack()
 		self:gui_cutout(stackframe, function()
 			GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
 			GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
-			GuiZSetForNextWidget(self.gui, self:new_z())
 			for _, elem in ipairs(stackframe.gui_elements) do
 				self:render_elem(elem, stackframe)
 			end
 			GuiOptionsClear(self.gui)
 		end, function()
-			GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2 + 2, stackframe.y / 2 + 2,
-				stackframe.width / 2 - 4,
-				stackframe.height / 2 - 4)
-			-- TODO: make the sounds go away
-			GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
-			GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
-			GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
-				stackframe.height / 2, 0, "mods/windows/files/invisible_9.png")
+			self:enclose_elem(function(id)
+				GuiImageNinePiece(self.gui, id, stackframe.x / 2 + 2, stackframe.y / 2 + 2,
+					stackframe.width / 2 - 4,
+					stackframe.height / 2 - 4)
+			end)
+			self:enclose_elem(function(id)
+				-- TODO: make the sounds go away
+				GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
+				GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+				GuiImageNinePiece(self.gui, id, stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
+					stackframe.height / 2, 0, "mods/windows/files/invisible_9.png")
+			end)
 
 			GuiOptionsClear(self.gui)
 		end)
@@ -228,7 +238,7 @@ function lib:render_elem(elem, stackframe)
 	local x2, y2 = x1 + stackframe.width, y1 + stackframe.height
 	local x = x2 * x_coeff + x1 * (1 - x_coeff) + x_mult * elem.offset_x
 	local y = y2 * y_coeff + y1 * (1 - y_coeff) + y_mult * elem.offset_x
-	elem.data.render(self.gui, elem, self:new_z(), x - stackframe.x, y - stackframe.y)
+	elem.data.render(self.gui, elem, self:new_z(), x - stackframe.x, y - stackframe.y) -- the element doesn't know about the library and so can't be enclosed
 end
 
 ---@private
