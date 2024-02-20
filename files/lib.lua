@@ -46,12 +46,14 @@ function lib:render()
 	self.gui_stack = {}
 	self.gui_z = -1000
 	GuiStartFrame(self.gui)
-	for window_idx, window in ipairs(self.windows) do
+	for window_idx = #self.windows, 1, -1 do
+		local window = self.windows[window_idx]
 		self:render_window(window, window_idx)
 	end
 	self:render_stack()
 end
 
+---@nodiscard
 ---@param tabs tab[]? {}
 ---@param x number? 0
 ---@param y number? 0
@@ -73,12 +75,14 @@ function lib:make_window(tabs, x, y, width, height)
 end
 
 ---@private
+---@nodiscard
 ---@return int id
 function lib:new_id()
 	self.gui_id = self.gui_id + 1
 	return self.gui_id
 end
 
+---@nodiscard
 ---@return tab[]
 function lib:default_tab_list()
 	return { utils:copy(self.default_tab) }
@@ -104,6 +108,7 @@ function lib:render_window(window, window_idx)
 end
 
 ---@private
+---@nodiscard
 ---@return int
 function lib:new_z()
 	self.gui_z = self.gui_z - 1
@@ -113,10 +118,11 @@ end
 ---@private
 ---@param stackframe gui_stackframe
 ---@param inner fun()
-function lib:gui_cutout(stackframe, inner)
+---@param outer fun()
+function lib:gui_cutout(stackframe, inner, outer)
 	-- credits to aarvlo for this method
+	outer()
 	local cutout_id = self:new_id()
-	print(cutout_id)
 	GuiAnimateBegin(self.gui)
 	GuiAnimateAlphaFadeIn(self.gui, cutout_id, 0, 0, true)
 	GuiBeginAutoBox(self.gui)
@@ -125,24 +131,9 @@ function lib:gui_cutout(stackframe, inner)
 	GuiEndAutoBoxNinePiece(self.gui)
 	GuiAnimateEnd(self.gui)
 	--your content here
-	GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
-	GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
 	inner()
 	GuiOptionsClear(self.gui)
 	GuiEndScrollContainer(self.gui)
-	-- TODO: make the sounds go away
-	GuiOptionsAdd(self.gui, defs.gui_option.NoSound)
-	GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
-	GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
-	GuiOptionsAdd(self.gui, defs.gui_option.IsDraggable)
-	GuiOptionsAdd(self.gui, defs.gui_option.IsExtraDraggable)
-	GuiOptionsAdd(self.gui, defs.gui_option.ScrollContainer_Smooth)
-	GuiOptionsAdd(self.gui, defs.gui_option.Hack_AllowDuplicateIds)
-	GuiOptionsAdd(self.gui,defs.gui_option.IgnoreContainer)
-	GuiOptionsAdd(self.gui,defs.gui_option._SnapToCenter)
-	-- GuiOptionsAdd(self.gui, defs.gui_option.NoSound)
-	GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
-		stackframe.height / 2)
 	--TODO: make windows manage their own bg as an inner() element
 end
 
@@ -152,9 +143,24 @@ function lib:render_stack()
 		GuiOptionsClear(self.gui)
 		table.sort(stackframe.gui_elements, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
 		self:gui_cutout(stackframe, function()
+			GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+			GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
+			GuiZSetForNextWidget(self.gui, self:new_z())
 			for _, elem in ipairs(stackframe.gui_elements) do
 				self:render_elem(elem, stackframe)
 			end
+			GuiOptionsClear(self.gui)
+		end, function()
+			GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2 + 2, stackframe.y / 2 + 2,
+				stackframe.width / 2 - 4,
+				stackframe.height / 2 - 4)
+			-- TODO: make the sounds go away
+			GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
+			GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+			GuiImageNinePiece(self.gui, self:new_id(), stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
+				stackframe.height / 2, 0, "mods/windows/files/invisible_9.png")
+
+			GuiOptionsClear(self.gui)
 		end)
 		--GuiImageNinePiece(self.gui, self:newGuiAnimateBegin(gui)
 		--(stackframe.x, stackframe.y, stackframe.width, stackframe.height, 0)
@@ -163,15 +169,10 @@ function lib:render_stack()
 	end
 end
 
----@param gui gui
----@param elem gui_element
----@param z number
----@param x number
----@param y number
+---@type render_fn
 local function render_text(gui, elem, z, x, y)
 	local text_elem = elem.data
 	---@cast text_elem text
-	print(z)
 	GuiZSetForNextWidget(gui, z)
 	if elem.centred then
 		local width, height = GuiGetTextDimensions(gui, text_elem.text)
@@ -183,6 +184,7 @@ local function render_text(gui, elem, z, x, y)
 	end
 end
 
+---@nodiscard
 ---@param text string
 ---@param z number
 ---@param anchor_x anchor_pos
@@ -266,31 +268,32 @@ function lib:handle_held(cursor_x, cursor_y)
 		if x == 1 then
 			local target_width = (self.resize.window.width + self.resize.window.x) - cursor_x_glued
 			local target_x = cursor_x_glued
-			if target_width < self.grab_size * 2 then
-				target_width = self.grab_size * 2
-				target_x = (self.resize.window.width + self.resize.window.x) - self.grab_size * 2
+			if target_width < self.grab_size * 3 then
+				target_width = self.grab_size * 3
+				target_x = (self.resize.window.width + self.resize.window.x) - self.grab_size * 3
 			end
 			self.resize.window.width = target_width
 			self.resize.window.x = target_x
 		elseif x == 2 then
-			self.resize.window.width = math.max(cursor_x_glued - self.resize.window.x, self.grab_size * 2)
+			self.resize.window.width = math.max(cursor_x_glued - self.resize.window.x, self.grab_size * 3)
 		end
 		if y == 1 then
 			local target_height = (self.resize.window.height + self.resize.window.y) - cursor_y_glued
 			local target_y = cursor_y_glued
-			if target_height < self.grab_size * 2 then
-				target_height = self.grab_size * 2
-				target_y = (self.resize.window.height + self.resize.window.y) - self.grab_size * 2
+			if target_height < self.grab_size * 3 then
+				target_height = self.grab_size * 3
+				target_y = (self.resize.window.height + self.resize.window.y) - self.grab_size * 3
 			end
 			self.resize.window.height = target_height
 			self.resize.window.y = target_y
 		elseif y == 2 then
-			self.resize.window.height = math.max(cursor_y_glued - self.resize.window.y, self.grab_size * 2)
+			self.resize.window.height = math.max(cursor_y_glued - self.resize.window.y, self.grab_size * 3)
 		end
 	end
 end
 
 ---@private
+---@nodiscard
 ---@param window window
 ---@param cursor_x number
 ---@param cursor_y number
