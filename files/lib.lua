@@ -1,12 +1,12 @@
 --dofile("mods/windows/files/types.lua")
 ---@type button_bundle
-local buttons = dofile_once("mods/windows/files/input_codes.lua")
+local buttons = dofile_once("mods/windows/files/defs/input_codes.lua")
 ---@type gui_enums
-local gui_enums = dofile_once("mods/windows/files/gui_enums.lua")
+local gui_enums = dofile_once("mods/windows/files/defs/gui_enums.lua")
 ---@type utils
-local utils = dofile_once("mods/windows/files/utils.lua")
+local utils = dofile_once("mods/windows/files/scripts/utils.lua")
 ---@type tab
-local default_tab = dofile_once("mods/windows/files/default_tab.lua")
+local default_tab = dofile_once("mods/windows/files/scripts/default_tab.lua")
 
 ---@class defs
 local defs = {}
@@ -23,17 +23,19 @@ defs.texture_wrapping = gui_enums.texture_wrapping
 ---@field private gui gui
 ---@field private gui_id int
 ---@field private drag drag? exists if a window is currently being dragged
----@field private resize resize?
+---@field private resize resize? similar to drag
 ---@field private gui_stack gui_stackframe[]
 ---@field private gui_z number
 ---@field default_tab tab
 ---@field grab_size int
+---@field tab_bar_height int
 local lib = {}
 lib.windows = {}
 lib.gui = GuiCreate()
 lib.grab_size = 15
 lib.gui_z = -1000
 lib.default_tab = default_tab
+lib.tab_bar_height = 8
 
 function lib:update()
 	self:check_clicks()
@@ -53,7 +55,6 @@ function lib:render()
 	self:render_stack()
 end
 
----@nodiscard
 ---@param tabs tab[]? {}
 ---@param x number? 0
 ---@param y number? 0
@@ -117,11 +118,12 @@ end
 
 ---@private
 ---@param stackframe gui_stackframe
+---@param pre fun()
 ---@param inner fun()
----@param outer fun()
-function lib:gui_cutout(stackframe, inner, outer)
+---@param post fun()
+function lib:gui_cutout(stackframe, pre, inner, post)
 	-- credits to aarvlo for this method
-	outer()
+	pre()
 	local cutout_id = self:new_id()
 	GuiAnimateBegin(self.gui)
 	GuiAnimateAlphaFadeIn(self.gui, cutout_id, 0, 0, true)
@@ -130,13 +132,13 @@ function lib:gui_cutout(stackframe, inner, outer)
 		stackframe.height / 2, false, 0, 0)
 	GuiEndAutoBoxNinePiece(self.gui)
 	GuiAnimateEnd(self.gui)
-	--your content here
 	inner()
 	GuiOptionsClear(self.gui)
 	GuiEndScrollContainer(self.gui)
-	--TODO: make windows manage their own bg as an inner() element
+	post()
 end
 
+---renders an element at the current z and id
 ---@private
 ---@param func fun(id: int)
 function lib:enclose_elem(func)
@@ -149,29 +151,37 @@ function lib:render_stack()
 	for _, stackframe in ipairs(self.gui_stack) do
 		GuiOptionsClear(self.gui)
 		table.sort(stackframe.gui_elements, function(a, b) return a.virtual_z_index > b.virtual_z_index end)
-		self:gui_cutout(stackframe, function()
-			GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
-			GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
-			for _, elem in ipairs(stackframe.gui_elements) do
-				self:render_elem(elem, stackframe)
-			end
-			GuiOptionsClear(self.gui)
-		end, function()
-			self:enclose_elem(function(id)
-				GuiImageNinePiece(self.gui, id, stackframe.x / 2 + 2, stackframe.y / 2 + 2,
-					stackframe.width / 2 - 4,
-					stackframe.height / 2 - 4)
-			end)
-			self:enclose_elem(function(id)
-				-- TODO: make the sounds go away
-				GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
-				GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
-				GuiImageNinePiece(self.gui, id, stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
-					stackframe.height / 2, 0, "mods/windows/files/invisible_9.png")
-			end)
+		self:gui_cutout(stackframe,
+			function()
+				self:enclose_elem(function(id)
+					GuiImageNinePiece(self.gui, id, stackframe.x / 2 + 2, stackframe.y / 2 + 2, stackframe.width / 2 - 4,
+						stackframe.height / 2 - 4, 1, "mods/windows/files/sprites/window_bg.png")
+				end)
+				self:enclose_elem(function(id)
+					-- TODO: make the sounds go away
+					GuiOptionsAdd(self.gui, defs.gui_option.ForceFocusable)
+					GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+					GuiImageNinePiece(self.gui, id, stackframe.x / 2, stackframe.y / 2, stackframe.width / 2,
+						stackframe.height / 2, 0, "mods/windows/files/sprites/invisible_9.png")
+				end)
 
-			GuiOptionsClear(self.gui)
-		end)
+				GuiOptionsClear(self.gui)
+			end,
+			function()
+				GuiOptionsAdd(self.gui, defs.gui_option.NoPositionTween)
+				GuiOptionsAdd(self.gui, defs.gui_option.NonInteractive)
+				for _, elem in ipairs(stackframe.gui_elements) do
+					self:render_elem(elem, stackframe)
+				end
+				GuiOptionsClear(self.gui)
+			end,
+			function()
+				self:enclose_elem(function(id)
+					GuiImageNinePiece(self.gui, id, stackframe.x / 2 + 2, stackframe.y / 2 + 2, stackframe.width / 2 - 4,
+						self.tab_bar_height - 4, 1, "mods/windows/files/sprites/window_bar.png")
+				end)
+			end
+		)
 		--GuiImageNinePiece(self.gui, self:newGuiAnimateBegin(gui)
 		--(stackframe.x, stackframe.y, stackframe.width, stackframe.height, 0)
 		-- GuiBeginScrollContainer(self.gui, -1, stackframe.x, stackframe.y, stackframe.width, stackframe.height,
@@ -179,19 +189,35 @@ function lib:render_stack()
 	end
 end
 
+-- ---@type render_fn
+-- local function render_image(gui, id, elem, z, x, y)
+-- 	local image_elem = elem.data
+-- 	---@cast image_elem image
+-- 	GuiZSetForNextWidget(gui, z)
+-- 	if elem.centred then
+-- 		local width, height = GuiGetImageDimensions(gui, image_elem.file)
+-- 		x, y = x - width, y - height
+-- 	end
+-- 	GuiImage(gui, id x / 2, y / 2, text_elem)
+-- 	if Image_elem.description then
+-- 		GuiTooltip(gui, Image_elem.description, "")
+-- 	end
+-- end
+
 ---@type render_fn
-local function render_text(gui, elem, z, x, y)
-	local text_elem = elem.data
-	---@cast text_elem text
+local function render_text(self, gui, id, z, x, y)
+	print(x, y, self.text)
 	GuiZSetForNextWidget(gui, z)
-	if elem.centred then
-		local width, height = GuiGetTextDimensions(gui, text_elem.text)
-		x, y = x - width, y - height
+	GuiText(gui, x / 2, y / 2, self.text)
+	if self.description then
+		GuiTooltip(gui, self.description, "")
 	end
-	GuiText(gui, x / 2, y / 2, text_elem.text)
-	if text_elem.description then
-		GuiTooltip(gui, text_elem.description, "")
-	end
+end
+
+---@type size_fn
+local function size_text(self, gui)
+	local width, height = GuiGetTextDimensions(gui, self.text)
+	return width, height
 end
 
 ---@nodiscard
@@ -207,7 +233,7 @@ end
 ---@return gui_element
 function lib:create_text_gui_elem(text, z, anchor_x, anchor_y, centred, offset_x, offset_y, colour, description)
 	---@type text
-	local data = { text = text, description = description, render = render_text }
+	local data = { text = text, description = description, render = render_text, size = size_text }
 	---@type gui_element
 	local elem = {
 		virtual_z_index = z,
@@ -234,11 +260,20 @@ function lib:render_elem(elem, stackframe)
 	local y_mult = elem.anchor_y == "high" and -1 or 1
 	local x_coeff = ({ low = 0, centre = 0.5, high = 1 })[elem.anchor_x]
 	local y_coeff = ({ low = 0, centre = 0.5, high = 1 })[elem.anchor_y]
-	local x1, y1 = stackframe.x, stackframe.y
-	local x2, y2 = x1 + stackframe.width, y1 + stackframe.height
+	local tabbed_y = stackframe.y + self.tab_bar_height * 2
+	local x1, y1 = stackframe.x, tabbed_y
+	local x2, y2 = x1 + stackframe.width, stackframe.y + stackframe.height
 	local x = x2 * x_coeff + x1 * (1 - x_coeff) + x_mult * elem.offset_x
+	print(x)
 	local y = y2 * y_coeff + y1 * (1 - y_coeff) + y_mult * elem.offset_x
-	elem.data.render(self.gui, elem, self:new_z(), x - stackframe.x, y - stackframe.y) -- the element doesn't know about the library and so can't be enclosed
+	if elem.centred then
+		local w, h = elem.data:size(self.gui)
+		x = x - w
+		h = h - w
+	end
+	self:enclose_elem(function(id)
+		elem.data:render(self.gui, id, self:new_z(), x - stackframe.x, y - stackframe.y) -- the element doesn't know about the library and so can't be enclosed
+	end)
 end
 
 ---@private
