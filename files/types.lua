@@ -4,7 +4,8 @@
 ---@alias bool boolean
 ---@alias tab_update_fn fun(lib: window_lib, window: window, tab_idx: int)
 ---@alias tab_render_fn fun(lib: window_lib, window: window, tab_idx: int): gui_element[]
----@alias render_fn fun(gui: gui, elem: gui_element, x: number, y:number)
+---@alias render_fn fun(self: self, gui: gui, id: number, z: number, x: number, y:number)
+---@alias size_fn fun(self: self, gui: gui): (width: number, height: number)
 
 ---@class (exact) tab
 ---@field title string
@@ -41,16 +42,18 @@
 ---@field blue number
 ---@field alpha number
 
----@class (exact) image
+---@class (exact) renderable
+---@field render render_fn
+---@field size size_fn
+
+---@class (exact) image: renderable
 ---@field size_x number
 ---@field size_y number
 ---@field file string
----@field render render_fn
 
----@class (exact) text
+---@class (exact) text: renderable
 ---@field text string
 ---@field description string?
----@field render render_fn
 
 ---@class (exact) gui_element
 ---@field virtual_z_index number
@@ -60,7 +63,7 @@
 ---@field offset_y number
 ---@field centred bool
 ---@field colour colour?
----@field data image | text
+---@field data renderable
 
 ---@class (exact) gui_stackframe
 ---@field gui_elements gui_element[]

@@ -1,6 +1,6 @@
 ---@type window_lib
 local lib = dofile_once("mods/windows/files/lib.lua")
-for i = 1, 5 do
+for i = 1, 1 do
 	local tablist = lib:default_tab_list()
 	if i == 1 then
 		---@type tab
